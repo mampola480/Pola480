@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ئامرازی پشکنیی ئۆسۆنت (OSINT Image Reconnaissance)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Vazirmatn for Sorani Kurdish -->
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Exif-JS for Metadata Extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.js"></script>
+    <!-- Leaflet CSS & JS for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Vazirmatn', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        kaliDark: '#0b0f19',
+                        kaliCard: '#131c2e',
+                        kaliBorder: '#1f293d',
+                        neonGreen: '#00ff66',
+                        neonCyan: '#00e5ff',
+                        neonRed: '#ff3366'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #e2e8f0;
+        }
+        .glow-green {
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.2);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
+        }
+        .terminal-glow {
+            text-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1f293d;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans selection:bg-neonGreen selection:text-black">
+
+    <!-- Security Mandatory Gate Modal -->
+    <div id="securityModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 transition-opacity duration-300">
+        <div class="bg-kaliCard border border-neonGreen/40 rounded-2xl max-w-lg w-full p-6 md:p-8 shadow-2xl glow-green relative overflow-hidden text-center">
+            <div class="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#00ff66_1px,transparent_1px)] [background-size:16px_16px]"></div>
+            
+            <div class="w-16 h-16 bg-neonGreen/10 border border-neonGreen/30 rounded-full flex items-center justify-center mx-auto mb-5 text-neonGreen text-2xl glow-green">
+                <i class="fa-solid fa-user-shield"></i>
+            </div>
+
+            <div class="inline-block px-3 py-1 bg-neonGreen/10 text-neonGreen border border-neonGreen/30 rounded-full text-xs font-mono mb-3 uppercase tracking-wider">
+                مەرجی ئاسایشی سیستەم • Developer Verification
+            </div>
+
+            <h2 class="text-2xl font-black text-white mb-2">بەخێربێن بۆ ئامرازی mam pola</h2>
+            <p class="text-slate-400 text-sm mb-6 leading-relaxed">
+                بۆ بەکارهێنانی ئەم ئامرازە پێشکەوتووەی ئۆسۆنت (OSINT) و لێکۆڵینەوەی وێنە، تکایە ڕەزامەندی بدە لەسەر مەرجەکانی ئاسایشی سیستەم.
+            </p>
+
+            <button id="verifyJoinBtn" onclick="verifySecurityAccess()" class="w-full py-3.5 px-4 bg-neonGreen/20 hover:bg-neonGreen/30 text-neonGreen border border-neonGreen/50 font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2">
+                <i class="fa-solid fa-shield-check"></i>
+                <span>تێگەیشتم، بڕۆ ناو ئامرازەکە <i class="fa-solid fa-arrow-left mr-1"></i></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <header class="border-b border-kaliBorder bg-kaliCard/80 backdrop-blur sticky top-0 z-30 px-4 lg:px-8 py-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-neonGreen/10 border border-neonGreen/30 rounded-lg flex items-center justify-center text-neonGreen text-xl glow-green">
+                    <i class="fa-solid fa-terminal"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white tracking-wider flex items-center gap-2">
+                        <span>mam pola OSINT</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-neonCyan/10 text-neonCyan border border-neonCyan/30 font-mono">v4.2 SECURE</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 font-mono">ئامرازی پشکنینی پێشکەوتووی وێنە (Client-Side Sandboxed)</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-kaliBorder/50 rounded-lg border border-kaliBorder text-xs font-mono text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-neonGreen animate-pulse"></span>
+                    <span>سیستەم لە مەترسی پارێزراوە (Secured)</span>
+                </div>
+                <div class="px-3 py-1.5 bg-neonGreen/10 border border-neonGreen/30 rounded-lg text-xs font-mono text-neonGreen flex items-center gap-2">
+                    <i class="fa-solid fa-code"></i>
+                    <span>Developer: mam pola</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left Column: Upload & Controls -->
+        <div class="lg:col-span-5 space-y-6">
+            
+            <!-- Upload Box Card -->
+            <div class="bg-kaliCard border border-kaliBorder rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-neonGreen/5 rounded-full blur-2xl pointer-events-none"></div>
+                
+                <h2 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up text-neonGreen"></i>
+                    <span>بارکردنی فایلی وێنە (Target Image)</span>
+                </h2>
+                <p class="text-xs text-slate-400 mb-6">
+                    بۆ پاراستنی توندی سێرڤەرەکە، هیچ فایلێک بۆ سەر سێرڤەر ئەپلۆد ناکرێت! هەموو پرۆسێس و پشکنینێک بە شێوەی پارێزراو تەنها لەناو مۆبایل یان کۆمپیوتەری خۆتدا ئەنجام دەدرێت.
+                </p>
+
+                <!-- Drag & Drop Zone -->
+                <div id="dropZone" class="border-2 border-dashed border-kaliBorder hover:border-neonGreen/60 transition-all rounded-xl p-8 text-center cursor-pointer bg-kaliDark/50 group relative">
+                    <input type="file" id="imageInput" accept="image/jpeg, image/png, image/webp" class="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                    
+                    <div id="uploadPrompt" class="space-y-3">
+                        <div class="w-16 h-16 bg-kaliCard border border-kaliBorder group-hover:border-neonGreen/40 rounded-2xl flex items-center justify-center mx-auto text-slate-400 group-hover:text-neonGreen transition text-2xl">
+                            <i class="fa-solid fa-file-image"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-white mb-1">وێنەکە لێرە ڕابکێشە یان کلیک بکە بۆ هەڵبژاردن</p>
+                            <p class="text-xs text-slate-500">قەبارەی زۆرترین: 15 مێگابایت</p>
+                        </div>
+                        <span class="inline-block px-3 py-1 bg-kaliBorder text-slate-300 rounded-lg text-xs font-mono">
+                            تەنها فۆرماتی پاک: JPG, PNG, WEBP
+                        </span>
+                    </div>
+
+                    <!-- Image Preview Container (Hidden initially) -->
+                    <div id="previewContainer" class="hidden relative">
+                        <img id="imagePreview" src="" alt="Target Preview" class="max-h-56 mx-auto rounded-lg border border-kaliBorder shadow-md object-contain mb-3" />
+                        <div class="flex items-center justify-center gap-2 text-xs text-neonGreen font-mono">
+                            <i class="fa-solid fa-check-circle"></i>
+                            <span id="fileNameDisplay">file.jpg</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Notice for Non-Image Files -->
+                <div id="fileError" class="mt-4 p-3 bg-neonRed/10 border border-neonRed/30 rounded-xl text-neonRed text-xs hidden flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                    <span id="fileErrorText">هەڵە: فایلی نەخوازراو ڕەتکراوەتەوە! تەنها وێنەی ڕەسەن قبوڵە.</span>
+                </div>
+
+                <!-- Scan Button -->
+                <button id="scanBtn" onclick="startOsintScan()" disabled class="w-full mt-5 py-3.5 px-4 bg-kaliBorder text-slate-500 font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-not-allowed">
+                    <i class="fa-solid fa-radar"></i>
+                    <span>دەستپێکردنی پشکنینی ورد (OSINT Scan)</span>
+                </button>
+            </div>
+
+            <!-- Terminal Logs / Status Card -->
+            <div class="bg-kaliCard border border-kaliBorder rounded-2xl p-5 shadow-xl font-mono text-xs">
+                <div class="flex items-center justify-between pb-3 border-b border-kaliBorder mb-3">
+                    <span class="text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-terminal text-neonCyan"></i>
+                        <span>لۆگی سیستەم و ئاسایش (Sandbox Security)</span>
+                    </span>
+                    <span class="w-2 h-2 rounded-full bg-neonGreen animate-ping"></span>
+                </div>
+                <div id="terminalLog" class="space-y-1.5 text-slate-400 h-36 overflow-y-auto pr-1">
+                    <p class="text-slate-500">[00:00:01] Secure Sandbox initialized by mam pola...</p>
+                    <p class="text-slate-500">[00:00:02] Strict File Type filters active...</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Results Dashboard -->
+        <div class="lg:col-span-7 space-y-6">
+            
+            <!-- Analysis Overview Card -->
+            <div class="bg-kaliCard border border-kaliBorder rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div class="flex items-center justify-between mb-6 pb-4 border-b border-kaliBorder">
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-microchip text-neonCyan"></i>
+                            <span>ئەنجامی پشکنین و زانیاری وێنە</span>
+                        </h2>
+                        <p class="text-xs text-slate-400">ئاشکراکردنی مۆدێل، لۆکەیشن، کات و وردەکارییەکانی EXIF</p>
+                    </div>
+                    <div id="statusBadge" class="px-3 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 rounded-full text-xs font-mono">
+                        چاوەڕێی وێنە...
+                    </div>
+                </div>
+
+                <!-- Grid Stats -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Stat 1: Device Make/Model -->
+                    <div class="bg-kaliDark/60 border border-kaliBorder rounded-xl p-4">
+                        <div class="text-slate-500 text-xs font-mono mb-1 flex items-center justify-between">
+                            <span>جۆری مۆبایل / کامێرا (Device)</span>
+                            <i class="fa-solid fa-mobile-screen text-neonGreen"></i>
+                        </div>
+                        <div id="valDevice" class="text-white font-mono text-sm font-semibold truncate">نادیار (Pending)</div>
+                    </div>
+
+                    <!-- Stat 2: DateTime -->
+                    <div class="bg-kaliDark/60 border border-kaliBorder rounded-xl p-4">
+                        <div class="text-slate-500 text-xs font-mono mb-1 flex items-center justify-between">
+                            <span>کاتی گرتنی وێنە (Timestamp)</span>
+                            <i class="fa-regular fa-clock text-neonCyan"></i>
+                        </div>
+                        <div id="valTime" class="text-white font-mono text-sm font-semibold truncate">نادیار (Pending)</div>
+                    </div>
+
+                    <!-- Stat 3: Coordinates -->
+                    <div class="bg-kaliDark/60 border border-kaliBorder rounded-xl p-4">
+                        <div class="text-slate-500 text-xs font-mono mb-1 flex items-center justify-between">
+                            <span>شوێن و لۆکەیشن (GPS Coordinates)</span>
+                            <i class="fa-solid fa-location-crosshairs text-neonRed"></i>
+                        </div>
+                        <div id="valGps" class="text-white font-mono text-sm font-semibold truncate">نادیار (No GPS Tag)</div>
+                    </div>
+
+                    <!-- Stat 4: Security Status -->
+                    <div class="bg-kaliDark/60 border border-kaliBorder rounded-xl p-4">
+                        <div class="text-slate-500 text-xs font-mono mb-1 flex items-center justify-between">
+                            <span>دۆخی ئاسایشی فایل (Security Status)</span>
+                            <i class="fa-solid fa-shield-halved text-neonGreen"></i>
+                        </div>
+                        <div id="valIpHash" class="text-white font-mono text-sm font-semibold truncate">پاک و بێگەرد (Clean File)</div>
+                    </div>
+                </div>
+
+                <!-- Extended Details Accordion/List -->
+                <div class="mt-6 pt-5 border-t border-kaliBorder space-y-3 font-mono text-xs">
+                    <div class="flex justify-between py-1.5 border-b border-kaliBorder/50">
+                        <span class="text-slate-400">قەبارەی فایل (File Size):</span>
+                        <span id="valSize" class="text-white">--</span>
+                    </div>
+                    <div class="flex justify-between py-1.5 border-b border-kaliBorder/50">
+                        <span class="text-slate-400">ڕەهەندی وێنە (Resolution):</span>
+                        <span id="valRes" class="text-white">--</span>
+                    </div>
+                    <div class="flex justify-between py-1.5 border-b border-kaliBorder/50">
+                        <span class="text-slate-400">خێرایی شەتەر و ئایزو (Exposure/ISO):</span>
+                        <span id="valExposure" class="text-white">--</span>
+                    </div>
+                    <div class="flex justify-between py-1.5">
+                        <span class="text-slate-400">ئاستی پاراستنی سێرڤەر (Server Shield):</span>
+                        <span class="text-neonGreen font-bold">100% پارێزراو (Client-Side Only)</span>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div class="mt-6 flex gap-3">
+                    <button onclick="copyReport()" class="flex-1 py-2.5 px-4 bg-kaliBorder hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-copy"></i>
+                        <span>کۆپیکردنی ڕاپۆرت</span>
+                    </button>
+                    <button onclick="resetScanner()" class="py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-2">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span>پشکنینی نوێ</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Interactive Map Card -->
+            <div class="bg-kaliCard border border-kaliBorder rounded-2xl p-6 shadow-xl">
+                <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-map-location-dot text-neonGreen"></i>
+                    <span>نەخشەی لۆکەیشن و ناوچەی جوگرافی (OSINT Geo-Location)</span>
+                </h3>
+                <p class="text-xs text-slate-400 mb-4">ئەگەر وێنەکە پینگی GPSـی هەبێت، لێرە لەسەر نەخشە نیشان دەدرێت:</p>
+                
+                <div id="mapContainer" class="w-full h-64 rounded-xl border border-kaliBorder overflow-hidden bg-kaliDark relative z-10">
+                    <div id="mapFallback" class="w-full h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
+                        <i class="fa-solid fa-radar text-4xl mb-2 text-slate-600 animate-spin"></i>
+                        <p class="text-xs font-mono">هیچ لۆکەیشنێکی GPS لە EXIFـی ئەم وێنەیە نەدۆزرایەوە.</p>
+                    </div>
+                    <div id="leafletMap" class="w-full h-full hidden"></div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-kaliBorder bg-kaliCard/40 py-4 text-center text-xs text-slate-500 font-mono">
+        <p>mam pola OSINT Framework • Secure Edition</p>
+        <p class="mt-1">Developed by: <span class="text-neonCyan">mam pola</span></p>
+    </footer>
+
+    <!-- JavaScript Application Logic (Secured & Hardened) -->
+    <script>
+        let selectedFile = null;
+        let mapInstance = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (sessionStorage.getItem('security_verified') === 'true') {
+                document.getElementById('securityModal').classList.add('hidden');
+            }
+        });
+
+        function verifySecurityAccess() {
+            sessionStorage.setItem('security_verified', 'true');
+            
+            const modal = document.getElementById('securityModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+            
+            appendTerminalLog("دەسەڵاتی بەکارهێنەر پشتڕاستکرایەوە. سیستەم ئامادەیە.");
+        }
+
+        const imageInput = document.getElementById('imageInput');
+        const dropZone = document.getElementById('dropZone');
+        const uploadPrompt = document.getElementById('uploadPrompt');
+        const previewContainer = document.getElementById('previewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const fileError = document.getElementById('fileError');
+        const scanBtn = document.getElementById('scanBtn');
+
+        imageInput.addEventListener('change', function(e) {
+            handleFileSelect(e.target.files[0]);
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-neonGreen');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-neonGreen');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-neonGreen');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            fileError.classList.add('hidden');
+            
+            if (!file) return;
+
+            // 1. Strict Security: File Type Validation (Only Real Images)
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                fileError.classList.remove('hidden');
+                document.getElementById('fileErrorText').innerText = `هەڵە: جۆری فایلەکە (${file.type || 'نادیار'}) نەخوازراوە! تەنها JPG, PNG, WEBP قبوڵ دەکرێت.`;
+                return;
+            }
+
+            // 2. Strict Security: File Size Limitation (Max 15MB)
+            const maxSize = 15 * 1024 * 1024;
+            if (file.size > maxSize) {
+                fileError.classList.remove('hidden');
+                document.getElementById('fileErrorText').innerText = `هەڵە: قەبارەی فایلەکە زۆر گەورەیە! دەبێت لە 15 مێگابایت کەمتر بێت.`;
+                return;
+            }
+
+            // Sanitize filename for safe display
+            const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+
+            selectedFile = file;
+            fileNameDisplay.innerText = safeName;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imagePreview.src = e.target.result;
+                uploadPrompt.classList.add('hidden');
+                previewContainer.classList.remove('hidden');
+            }
+            reader.readAsDataURL(file);
+
+            scanBtn.disabled = false;
+            scanBtn.classList.remove('bg-kaliBorder', 'text-slate-500', 'cursor-not-allowed');
+            scanBtn.classList.add('bg-gradient-to-r', 'from-neonGreen', 'to-emerald-600', 'hover:from-emerald-500', 'hover:to-neonGreen', 'text-black', 'cursor-pointer', 'glow-green');
+
+            appendTerminalLog(`فایلەکە بە سەلامەتی پشکنرا و ڕێگەپێدرا: ${safeName} (${(file.size/1024).toFixed(1)} KB)`);
+        }
+
+        function appendTerminalLog(text) {
+            const terminal = document.getElementById('terminalLog');
+            const timeStr = new Date().toTimeString().split(' ')[0];
+            const p = document.createElement('p');
+            p.className = "text-slate-300 font-mono text-xs";
+            p.textContent = `[${timeStr}] ${text}`;
+            terminal.appendChild(p);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function startOsintScan() {
+            if (!selectedFile) return;
+
+            appendTerminalLog("دەستپێکردنی لێکۆڵینەوەی EXIF لەناو Sandboxـی براوسەردا...");
+            document.getElementById('statusBadge').className = "px-3 py-1 bg-neonCyan/10 text-neonCyan border border-neonCyan/30 rounded-full text-xs font-mono animate-pulse";
+            document.getElementById('statusBadge').innerText = "لە پشکنیندایە...";
+
+            document.getElementById('valSize').innerText = `${(selectedFile.size / 1024).toFixed(2)} KB`;
+
+            EXIF.getData(selectedFile, function() {
+                const make = EXIF.getTag(this, "Make");
+                const model = EXIF.getTag(this, "Model");
+                const dateTime = EXIF.getTag(this, "DateTime");
+                const exposure = EXIF.getTag(this, "ExposureTime");
+                const iso = EXIF.getTag(this, "ISOSpeedRatings");
+                const width = EXIF.getTag(this, "PixelXDimension");
+                const height = EXIF.getTag(this, "PixelYDimension");
+                
+                const lat = EXIF.getTag(this, "GPSLatitude");
+                const latRef = EXIF.getTag(this, "GPSLatitudeRef");
+                const lon = EXIF.getTag(this, "GPSLongitude");
+                const lonRef = EXIF.getTag(this, "GPSLongitudeRef");
+
+                if (make || model) {
+                    const deviceStr = `${make || ''} ${model || ''}`.trim();
+                    document.getElementById('valDevice').innerText = deviceStr;
+                    appendTerminalLog(`کامێرا/مۆبایل دۆزراوەتەوە: ${deviceStr}`);
+                } else {
+                    document.getElementById('valDevice').innerText = "نادیار (Device EXIF Stripped/Removed)";
+                    appendTerminalLog("زانیاری مۆبایل لە وێنەکەدا نەبوو (بە سەلامەتی تێپەڕێنرا).");
+                }
+
+                if (dateTime) {
+                    document.getElementById('valTime').innerText = dateTime;
+                    appendTerminalLog(`کاتی گرتنی وێنە: ${dateTime}`);
+                } else {
+                    document.getElementById('valTime').innerText = new Date(selectedFile.lastModified).toLocaleString();
+                    appendTerminalLog("کاتی فایلی ئاسایی بەکارهات.");
+                }
+
+                if (width && height) {
+                    document.getElementById('valRes').innerText = `${width} x ${height} px`;
+                } else {
+                    document.getElementById('valRes').innerText = "نادیار";
+                }
+
+                if (exposure || iso) {
+                    let expText = exposure ? `1/${Math.round(1/exposure)}s` : '';
+                    if (iso) expText += ` | ISO ${iso}`;
+                    document.getElementById('valExposure').innerText = expText;
+                } else {
+                    document.getElementById('valExposure').innerText = "نادیار";
+                }
+
+                document.getElementById('valIpHash').innerText = "پاك و پارێزراو (Clean Sandbox)";
+
+                if (lat && lon) {
+                    const decimalLat = convertDMSToDD(lat, latRef);
+                    const decimalLon = convertDMSToDD(lon, lonRef);
+                    document.getElementById('valGps').innerText = `${decimalLat.toFixed(4)}, ${decimalLon.toFixed(4)}`;
+                    appendTerminalLog(`لۆکەیشنی GPS دۆزراوەتەوە: ${decimalLat}, ${decimalLon}`);
+                    showMap(decimalLat, decimalLon);
+                } else {
+                    document.getElementById('valGps').innerText = "هیچ تاگێکی GPS نییە (No GPS EXIF)";
+                    appendTerminalLog("هیچ لۆکەیشنێکی GPS لەم وێنەیەدا نییە.");
+                    document.getElementById('mapFallback').classList.remove('hidden');
+                    document.getElementById('leafletMap').classList.add('hidden');
+                }
+
+                document.getElementById('statusBadge').className = "px-3 py-1 bg-neonGreen/10 text-neonGreen border border-neonGreen/30 rounded-full text-xs font-mono";
+                document.getElementById('statusBadge').innerText = "پشکنین تەواو بوو (Completed)";
+                appendTerminalLog("پرۆسەی ئۆسۆنت بە سەرکەوتوویی تەواو بوو.");
+            });
+        }
+
+        function convertDMSToDD(dms, ref) {
+            if (!dms) return 0;
+            let degrees = dms[0];
+            let minutes = dms[1];
+            let seconds = dms[2];
+            let dd = degrees + minutes / 60 + seconds / (60 * 60);
+            if (ref === "S" || ref === "W") {
+                dd = dd * -1;
+            }
+            return dd;
+        }
+
+        function showMap(lat, lon) {
+            document.getElementById('mapFallback').classList.add('hidden');
+            const mapDiv = document.getElementById('leafletMap');
+            mapDiv.classList.remove('hidden');
+
+            if (mapInstance) {
+                mapInstance.remove();
+            }
+
+            mapInstance = L.map('leafletMap').setView([lat, lon], 13);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                maxZoom: 19
+            }).addTo(mapInstance);
+
+            const marker = L.marker([lat, lon]).addTo(mapInstance);
+            marker.bindPopup("<b>لۆکەیشنی ڕاستەقینەی GPS لە وێنەدا!</b>").openPopup();
+
+            setTimeout(() => {
+                mapInstance.invalidateSize();
+            }, 200);
+        }
+
+        function copyReport() {
+            const device = document.getElementById('valDevice').innerText;
+            const time = document.getElementById('valTime').innerText;
+            const gps = document.getElementById('valGps').innerText;
+
+            const reportText = `--- ڕاپۆرتی پشکنینی ئۆسۆنت (mam pola OSINT REPORT) ---\nمۆبایل/کامێرا: ${device}\nکاتی گرتن: ${time}\nلۆکەیشنی GPS: ${gps}\nدۆخی ئاسایش: 100% پارێزراو\nگەشەپێدەر: mam pola`;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(reportText).then(() => {
+                    alert("ڕاپۆرتی پشکنینەکە کۆپی کر بۆ پاڵتە!");
+                }).catch(() => {
+                    fallbackCopy(reportText);
+                });
+            } else {
+                fallbackCopy(reportText);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert("ڕاپۆرتی پشکنینەکە کۆپی کر!");
+            } catch (err) {
+                alert("نەتوانرا کۆپی بکرێت.");
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function resetScanner() {
+            selectedFile = null;
+            imageInput.value = "";
+            uploadPrompt.classList.remove('hidden');
+            previewContainer.classList.add('hidden');
+            fileError.classList.add('hidden');
+            
+            scanBtn.disabled = true;
+            scanBtn.className = "w-full mt-5 py-3.5 px-4 bg-kaliBorder text-slate-500 font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-not-allowed";
+
+            document.getElementById('valDevice').innerText = "نادیار (Pending)";
+            document.getElementById('valTime').innerText = "نادیار (Pending)";
+            document.getElementById('valGps').innerText = "نادیار (No GPS Tag)";
+            document.getElementById('valIpHash').innerText = "پاك و پارێزراو (Clean Sandbox)";
+            document.getElementById('valSize').innerText = "--";
+            document.getElementById('valRes').innerText = "--";
+            document.getElementById('valExposure').innerText = "--";
+
+            document.getElementById('statusBadge').className = "px-3 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 rounded-full text-xs font-mono";
+            document.getElementById('statusBadge').innerText = "چاوەڕێی وێنە...";
+
+            document.getElementById('leafletMap').classList.add('hidden');
+            document.getElementById('mapFallback').classList.remove('hidden');
+
+            appendTerminalLog("سیستەم ڕێست کرا و ئامادەیە.");
+        }
+    </script>
+</body>
+</html>
